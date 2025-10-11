@@ -12,7 +12,8 @@ const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors());
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(path.join(__dirname, 'client/build')));
 
 // Configure multer for file uploads
@@ -109,12 +110,12 @@ function initializeDatabase() {
       
       const dbFiles = files
         .filter(file => file.endsWith('.db'))
+        .sort()
+        .reverse() // Sort by filename (ISO timestamp) descending
         .map(file => ({
           name: file,
-          path: path.join(dbDir, file),
-          created: fs.statSync(path.join(dbDir, file)).birthtime
-        }))
-        .sort((a, b) => b.created - a.created); // Most recent first
+          path: path.join(dbDir, file)
+        }));
       
       if (dbFiles.length > 0) {
         // Load the most recent database
@@ -145,6 +146,46 @@ function initializeDatabase() {
 
 // Initialize the database system
 initializeDatabase();
+
+// Force reload most recent database endpoint
+app.post('/api/reload-database', (req, res) => {
+  const dbDir = path.join(__dirname, 'databases');
+  fs.readdir(dbDir, (err, files) => {
+    if (err) {
+      res.status(500).json({ error: 'Error reading databases directory' });
+      return;
+    }
+    
+    const dbFiles = files
+      .filter(file => file.endsWith('.db'))
+      .sort()
+      .reverse(); // Sort by filename (ISO timestamp) descending
+    
+    if (dbFiles.length === 0) {
+      res.status(404).json({ error: 'No databases found' });
+      return;
+    }
+    
+    const mostRecent = dbFiles[0];
+    const dbPath = path.join(dbDir, mostRecent);
+    
+    // Close current database if open
+    if (db) {
+      db.close();
+    }
+    
+    // Load the most recent database
+    db = new sqlite3.Database(dbPath, (err) => {
+      if (err) {
+        res.status(500).json({ error: 'Error loading database' });
+      } else {
+        currentDbPath = dbPath;
+        console.log(`Reloaded database: ${mostRecent}`);
+        res.json({ success: true, database: mostRecent });
+      }
+    });
+  });
+});
 
 // Parse CSV file
 function parseCSV(filePath) {
@@ -356,19 +397,20 @@ app.post('/api/save-data', (req, res) => {
         
         // Insert repair items for this unit
         if (unitData.repair_items && Array.isArray(unitData.repair_items)) {
-          unitData.repair_items.forEach(repair => {
+          unitData.repair_items.forEach((repair, idx) => {
             // Skip undefined repair items
             if (!repair) {
-              console.log('Skipping undefined repair item');
               return;
             }
+            
+            const cost = repair.estimated_cost || 0;
             
             repairStmt.run([
               unitId,
               repair.repair_type || '',
               repair.description || '',
               repair.priority || 1,
-              repair.estimated_cost || 0,
+              cost,
               repair.supplier || '',
               repair.required_completion_date || '',
               repair.actual_completion_status || 'incomplete',

@@ -13,6 +13,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Load units from database on component mount
   useEffect(() => {
@@ -141,13 +142,17 @@ function App() {
   const handleSaveToDatabase = async () => {
     if (uploadedData) {
       setLoading(true);
+      setError('');
+      setSuccess('');
       try {
         await axios.post('/api/save-data', { units: uploadedData });
-        setSuccess('Changes saved to database successfully!');
-        console.log('Changes saved to database');
+        setSuccess('Changes saved to database successfully! Analysis reports updated.');
+        setRefreshKey(prev => prev + 1); // Force refresh of analysis screens
+        setTimeout(() => setSuccess(''), 3000);
       } catch (error) {
         console.error('Error saving changes to database:', error);
         setError('Error saving changes to database');
+        setTimeout(() => setError(''), 5000);
       } finally {
         setLoading(false);
       }
@@ -299,7 +304,7 @@ function App() {
                 </button>
               </div>
             </div>
-            <AnalysisScreen />
+            <AnalysisScreen key={refreshKey} />
           </div>
         );
 
@@ -312,7 +317,7 @@ function App() {
               </button>
               <h2>Database Access & Cost Breakdown</h2>
               <div>
-                <button className="btn btn-info" onClick={() => window.location.reload()}>
+                <button className="btn btn-info" onClick={() => setRefreshKey(prev => prev + 1)}>
                   Refresh Data
                 </button>
                 <button className="btn" onClick={() => setCurrentView('upload')}>
@@ -320,7 +325,7 @@ function App() {
                 </button>
               </div>
             </div>
-            <DatabaseScreen />
+            <DatabaseScreen key={refreshKey} />
           </div>
         );
 

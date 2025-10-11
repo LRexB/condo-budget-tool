@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 const UnitDisplay = ({ 
@@ -16,6 +16,7 @@ const UnitDisplay = ({
   const [repairItems, setRepairItems] = useState([]);
   const [supplierSuggestions, setSupplierSuggestions] = useState([]);
   const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
+  const autoSaveTimerRef = useRef(null);
 
   // Update repair items when unitData changes
   useEffect(() => {
@@ -23,6 +24,15 @@ const UnitDisplay = ({
       setRepairItems(unitData.repair_items);
     }
   }, [unitData]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, []);
 
   // Load supplier suggestions
   useEffect(() => {
@@ -72,11 +82,21 @@ const UnitDisplay = ({
       [field]: value
     };
     setRepairItems(updatedItems);
-
-    // Auto-save changes
+    
+    // Auto-save changes to parent component
     if (onSaveUnitChanges) {
       onSaveUnitChanges(currentIndex, updatedItems);
     }
+
+    // Debounced auto-save to database (2 seconds after last change)
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+    autoSaveTimerRef.current = setTimeout(() => {
+      if (onSaveToDatabase) {
+        onSaveToDatabase();
+      }
+    }, 2000);
   };
 
   const handleSupplierChange = (itemIndex, value) => {
