@@ -145,6 +145,7 @@ const UnitDisplay = ({
     return <div>No unit data available</div>;
   }
 
+
   // Filter items with descriptions
   const itemsWithDescriptions = repairItems.filter(item => 
     item.description && item.description.trim() !== ''

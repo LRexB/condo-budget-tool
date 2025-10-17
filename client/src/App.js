@@ -15,9 +15,9 @@ function App() {
   const [success, setSuccess] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Load units from database on component mount
+  // Load session data on component mount
   useEffect(() => {
-    loadUnits();
+    handleLoadPreviousSession();
   }, []);
 
   const loadUnits = async () => {
@@ -101,7 +101,7 @@ function App() {
 
   const handleNewSession = async () => {
     if (uploadedData && uploadedData.length > 0) {
-      const confirmed = window.confirm('Are you sure you want to start a new session? This will clear all current data.');
+      const confirmed = window.confirm('Are you sure you want to start a new session? This will create a new database, but your current data will be preserved in the previous database.');
       if (!confirmed) return;
     }
     
@@ -302,6 +302,14 @@ function App() {
               totalUnits={uploadedData.length}
               allUnits={uploadedData}
             />
+            {/* Debug info for units 62-71 issue */}
+            <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '10px', padding: '10px', backgroundColor: '#f5f5f5' }}>
+              <strong>Debug Info:</strong><br/>
+              Current Unit Index: {currentUnitIndex}<br/>
+              Total Units: {uploadedData?.length || 0}<br/>
+              Current Unit Data: {uploadedData?.[currentUnitIndex] ? 'Present' : 'Missing'}<br/>
+              Units 60-70: {uploadedData?.slice(60, 71).map((unit, idx) => `${60 + idx}: ${unit?.address_number || 'N/A'}`).join(', ')}
+            </div>
           </div>
         );
 
