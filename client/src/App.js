@@ -159,6 +159,21 @@ function App() {
     }
   };
 
+  // Navigate with auto-save
+  const navigateWithSave = async (newView) => {
+    if (uploadedData) {
+      try {
+        await axios.post('/api/save-data', { units: uploadedData });
+        setSuccess('Changes auto-saved!');
+        setRefreshKey(prev => prev + 1);
+        setTimeout(() => setSuccess(''), 2000);
+      } catch (error) {
+        console.error('Error auto-saving:', error);
+      }
+    }
+    setCurrentView(newView);
+  };
+
   const handleUnitSelect = (unitIndex) => {
     if (uploadedData && unitIndex >= 0 && unitIndex < uploadedData.length) {
       setCurrentUnitIndex(unitIndex);
@@ -246,11 +261,14 @@ function App() {
               <div>
                 <button 
                   className="btn btn-info" 
-                  onClick={() => setCurrentView('analysis')}
+                  onClick={() => navigateWithSave('analysis')}
                   disabled={!uploadedData || uploadedData.length === 0}
                 >
                   View Analysis
                 </button>
+                <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.5rem' }}>
+                  💡 Changes auto-save when navigating between units or to reports
+                </div>
                 <button 
                   className="btn btn-success" 
                   onClick={handleSaveData}
@@ -296,7 +314,7 @@ function App() {
               </button>
               <h2>Analysis & Reports</h2>
               <div>
-                <button className="btn btn-info" onClick={() => setCurrentView('database')}>
+                <button className="btn btn-info" onClick={() => navigateWithSave('database')}>
                   Database View
                 </button>
                 <button className="btn" onClick={() => setCurrentView('upload')}>

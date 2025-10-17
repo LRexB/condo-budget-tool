@@ -364,9 +364,12 @@ app.post('/api/save-data', (req, res) => {
   const { units } = req.body;
   
   db.serialize(() => {
-    // Clear existing data
-    db.run('DELETE FROM repair_items');
-    db.run('DELETE FROM units');
+    // Clear existing data only if this is a full reload
+    // For auto-save, we should update existing records instead
+    if (req.body.fullReload !== false) {
+      db.run('DELETE FROM repair_items');
+      db.run('DELETE FROM units');
+    }
     
     const stmt = db.prepare('INSERT INTO units (address_number, address_street, name1, name2) VALUES (?, ?, ?, ?)');
     const repairStmt = db.prepare('INSERT INTO repair_items (unit_id, repair_type, description, priority, estimated_cost, supplier, required_completion_date, actual_completion_status, actual_completion_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
@@ -596,13 +599,13 @@ app.get('/api/analysis/suppliers', (req, res) => {
   
   db.all(`
     SELECT 
-      supplier,
+      TRIM(supplier) as supplier,
       COUNT(*) as repair_count,
       SUM(estimated_cost) as total_cost,
       AVG(estimated_cost) as average_cost
     FROM repair_items 
     WHERE supplier != '' AND supplier IS NOT NULL
-    GROUP BY supplier
+    GROUP BY TRIM(supplier)
     ORDER BY total_cost DESC
   `, (err, rows) => {
     if (err) {

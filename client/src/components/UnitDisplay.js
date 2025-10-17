@@ -16,12 +16,14 @@ const UnitDisplay = ({
   const [repairItems, setRepairItems] = useState([]);
   const [supplierSuggestions, setSupplierSuggestions] = useState([]);
   const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const autoSaveTimerRef = useRef(null);
 
   // Update repair items when unitData changes
   useEffect(() => {
     if (unitData && unitData.repair_items) {
       setRepairItems(unitData.repair_items);
+      setHasUnsavedChanges(false); // Reset unsaved changes when switching units
     }
   }, [unitData]);
 
@@ -82,25 +84,29 @@ const UnitDisplay = ({
       [field]: value
     };
     setRepairItems(updatedItems);
+    setHasUnsavedChanges(true);
     
     // Auto-save changes to parent component
     if (onSaveUnitChanges) {
       onSaveUnitChanges(currentIndex, updatedItems);
     }
 
-    // Debounced auto-save to database (2 seconds after last change)
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current);
-    }
-    autoSaveTimerRef.current = setTimeout(() => {
-      if (onSaveToDatabase) {
-        onSaveToDatabase();
-      }
-    }, 2000);
+    // Auto-save to database disabled to prevent data duplication
+    // Use manual "Save Changes" button instead
+    // if (autoSaveTimerRef.current) {
+    //   clearTimeout(autoSaveTimerRef.current);
+    // }
+    // autoSaveTimerRef.current = setTimeout(() => {
+    //   if (onSaveToDatabase) {
+    //     onSaveToDatabase();
+    //   }
+    // }, 2000);
   };
 
   const handleSupplierChange = (itemIndex, value) => {
-    handleFieldChange(itemIndex, 'supplier', value);
+    // Trim whitespace to prevent duplicate suppliers
+    const trimmedValue = value.trim();
+    handleFieldChange(itemIndex, 'supplier', trimmedValue);
     setShowSupplierDropdown(false);
   };
 
@@ -120,6 +126,19 @@ const UnitDisplay = ({
     if (onSaveToDatabase) {
       onSaveToDatabase();
     }
+    setHasUnsavedChanges(false);
+  };
+
+  // Auto-save when navigating between units
+  const handleNavigationWithSave = (navigationFunction) => {
+    if (hasUnsavedChanges) {
+      handleSaveChanges();
+      // Show brief save confirmation
+      setTimeout(() => {
+        // The save success message from App.js will show
+      }, 100);
+    }
+    navigationFunction();
   };
 
   if (!unitData) {
@@ -183,7 +202,11 @@ const UnitDisplay = ({
                   step="0.01"
                   min="0"
                   value={item.estimated_cost || ''}
-                  onChange={(e) => handleFieldChange(index, 'estimated_cost', parseFloat(e.target.value) || '')}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    const numValue = value === '' ? 0 : parseFloat(value);
+                    handleFieldChange(index, 'estimated_cost', isNaN(numValue) ? 0 : numValue);
+                  }}
                 />
               </div>
               
@@ -251,19 +274,33 @@ const UnitDisplay = ({
         ))}
       </div>
 
+      {/* Unsaved Changes Warning */}
+      {hasUnsavedChanges && (
+        <div style={{
+          backgroundColor: '#fff3cd',
+          border: '1px solid #ffeaa7',
+          borderRadius: '4px',
+          padding: '10px',
+          margin: '10px 0',
+          color: '#856404'
+        }}>
+          ⚠️ <strong>You have unsaved changes!</strong> Click "Save Changes" or navigate to another unit to auto-save and update reports.
+        </div>
+      )}
+
       {/* Navigation */}
       <div className="navigation">
         <div className="nav-buttons">
           <button 
             className="btn btn-secondary" 
-            onClick={onPrevUnit}
+            onClick={() => handleNavigationWithSave(onPrevUnit)}
             disabled={currentIndex === 0}
           >
             ← Previous Unit
           </button>
           <button 
             className="btn btn-primary" 
-            onClick={onNextUnit}
+            onClick={() => handleNavigationWithSave(onNextUnit)}
             disabled={currentIndex >= totalUnits - 1}
           >
             Next Unit →
@@ -274,7 +311,7 @@ const UnitDisplay = ({
           <label>Jump to Unit:</label>
           <select 
             value={currentIndex} 
-            onChange={(e) => onUnitSelect(parseInt(e.target.value))}
+            onChange={(e) => handleNavigationWithSave(() => onUnitSelect(parseInt(e.target.value)))}
           >
             {allUnits.map((unit, index) => (
               <option key={index} value={index}>
@@ -285,10 +322,15 @@ const UnitDisplay = ({
         </div>
         
         <button 
-          className="btn btn-success" 
+          className={`btn ${hasUnsavedChanges ? 'btn-warning' : 'btn-success'}`}
           onClick={handleSaveChanges}
+          style={{
+            backgroundColor: hasUnsavedChanges ? '#ffc107' : '#28a745',
+            color: hasUnsavedChanges ? '#000' : '#fff',
+            fontWeight: hasUnsavedChanges ? 'bold' : 'normal'
+          }}
         >
-          Save Changes
+          {hasUnsavedChanges ? '⚠️ Save Changes (Unsaved)' : '✅ Save Changes'}
         </button>
       </div>
     </div>
