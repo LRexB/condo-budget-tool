@@ -205,6 +205,26 @@ body {
   font-style: italic;
 }
 
+.copy-button {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-left: 10px;
+  transition: background-color 0.2s;
+}
+
+.copy-button:hover {
+  background: #0056b3;
+}
+
+.copy-button:active {
+  background: #004085;
+}
+
 .repair-fields {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

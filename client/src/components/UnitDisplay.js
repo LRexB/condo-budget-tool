@@ -141,6 +141,36 @@ const UnitDisplay = ({
     navigationFunction();
   };
 
+  const handleCopyToAllUnits = async (repairItem) => {
+    if (!repairItem.id || !repairItem.repair_type) {
+      alert('Cannot copy: Missing repair item ID or type');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Copy this repair item data to all other "${repairItem.repair_type}" items across all units?\n\n` +
+      `This will update: Priority, Cost, Supplier, Dates, and Status for all matching repair types.`
+    );
+    
+    if (!confirmed) return;
+
+    try {
+      const response = await axios.post('/api/copy-repair-item', {
+        repairItemId: repairItem.id,
+        repairType: repairItem.repair_type
+      });
+      
+      if (response.data.success) {
+        alert(`✅ ${response.data.message}`);
+        // Refresh the data to show updated values
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Error copying repair item:', error);
+      alert('❌ Error copying repair item: ' + (error.response?.data?.error || error.message));
+    }
+  };
+
   if (!unitData) {
     return <div>No unit data available</div>;
   }
@@ -182,6 +212,13 @@ const UnitDisplay = ({
             <div className="repair-item-header">
               <div className="repair-type">{item.repair_type}</div>
               <div className="repair-description">{item.description}</div>
+              <button 
+                className="copy-button"
+                onClick={() => handleCopyToAllUnits(item)}
+                title={`Copy this repair item data to all other "${item.repair_type}" items`}
+              >
+                📋 Copy to All
+              </button>
             </div>
             
             <div className="repair-fields">

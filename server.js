@@ -848,6 +848,135 @@ app.get('/api/load-session', (req, res) => {
   });
 });
 
+// Migrate database schema to add missing columns
+app.post('/api/migrate-database', (req, res) => {
+  if (!db) {
+    return res.status(400).json({ error: 'No database loaded' });
+  }
+  
+  // Check if columns exist and add them if missing
+  db.all("PRAGMA table_info(repair_items)", (err, columns) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    
+    const columnNames = columns.map(col => col.name);
+    const migrations = [];
+    
+    if (!columnNames.includes('required_completion_date')) {
+      migrations.push('ALTER TABLE repair_items ADD COLUMN required_completion_date TEXT');
+    }
+    if (!columnNames.includes('actual_completion_status')) {
+      migrations.push('ALTER TABLE repair_items ADD COLUMN actual_completion_status TEXT DEFAULT "incomplete"');
+    }
+    if (!columnNames.includes('actual_completion_date')) {
+      migrations.push('ALTER TABLE repair_items ADD COLUMN actual_completion_date TEXT');
+    }
+    
+    if (migrations.length === 0) {
+      return res.json({ success: true, message: 'Database schema is up to date' });
+    }
+    
+    // Execute migrations
+    let completed = 0;
+    migrations.forEach((migration, index) => {
+      db.run(migration, (err) => {
+        if (err) {
+          return res.status(500).json({ error: `Migration failed: ${err.message}` });
+        }
+        completed++;
+        if (completed === migrations.length) {
+          res.json({ 
+            success: true, 
+            message: `Database migrated successfully. Added ${migrations.length} columns.` 
+          });
+        }
+      });
+    });
+  });
+});
+
+// Copy repair item data to all units with same repair type
+app.post('/api/copy-repair-item', (req, res) => {
+  const { repairItemId, repairType } = req.body;
+  
+  if (!repairItemId || !repairType) {
+    return res.status(400).json({ error: 'Missing repairItemId or repairType' });
+  }
+  
+  // First, get the source repair item data
+  db.get(`
+    SELECT priority, estimated_cost, supplier, required_completion_date, 
+           actual_completion_status, actual_completion_date
+    FROM repair_items 
+    WHERE id = ?
+  `, [repairItemId], (err, sourceItem) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    
+    if (!sourceItem) {
+      return res.status(404).json({ error: 'Source repair item not found' });
+    }
+    
+    // Only copy non-empty values to avoid overwriting existing data
+    const updates = [];
+    const values = [];
+    
+    if (sourceItem.priority && sourceItem.priority > 0) {
+      updates.push('priority = ?');
+      values.push(sourceItem.priority);
+    }
+    if (sourceItem.estimated_cost && sourceItem.estimated_cost > 0) {
+      updates.push('estimated_cost = ?');
+      values.push(sourceItem.estimated_cost);
+    }
+    if (sourceItem.supplier && sourceItem.supplier.trim() !== '') {
+      updates.push('supplier = ?');
+      values.push(sourceItem.supplier);
+    }
+    if (sourceItem.required_completion_date && sourceItem.required_completion_date.trim() !== '') {
+      updates.push('required_completion_date = ?');
+      values.push(sourceItem.required_completion_date);
+    }
+    if (sourceItem.actual_completion_status && sourceItem.actual_completion_status !== 'incomplete') {
+      updates.push('actual_completion_status = ?');
+      values.push(sourceItem.actual_completion_status);
+    }
+    if (sourceItem.actual_completion_date && sourceItem.actual_completion_date.trim() !== '') {
+      updates.push('actual_completion_date = ?');
+      values.push(sourceItem.actual_completion_date);
+    }
+    
+    if (updates.length === 0) {
+      return res.json({ 
+        success: true, 
+        message: 'No data to copy (all fields are empty)',
+        changes: 0
+      });
+    }
+    
+    values.push(repairType, repairItemId);
+    
+    // Update all repair items with the same repair type
+    db.run(`
+      UPDATE repair_items 
+      SET ${updates.join(', ')}
+      WHERE repair_type = ? AND id != ?
+    `, values, function(err) {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      
+      res.json({ 
+        success: true, 
+        message: `Copied data to ${this.changes} repair items of type "${repairType}"`,
+        changes: this.changes
+      });
+    });
+  });
+});
+
 // Serve React app
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
