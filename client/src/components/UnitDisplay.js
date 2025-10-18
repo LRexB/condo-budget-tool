@@ -36,6 +36,36 @@ const UnitDisplay = ({
     };
   }, []);
 
+  // Keyboard navigation: Arrow keys for previous/next unit
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      // Only handle arrow keys if not typing in an input field
+      if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.tagName === 'SELECT') {
+        return;
+      }
+
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        if (currentIndex > 0) {
+          onPrevUnit();
+        }
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        if (currentIndex < totalUnits - 1) {
+          onNextUnit();
+        }
+      }
+    };
+
+    // Add event listener
+    window.addEventListener('keydown', handleKeyDown);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [currentIndex, totalUnits, onPrevUnit, onNextUnit]);
+
   // Load supplier suggestions
   useEffect(() => {
     const loadSupplierSuggestions = async () => {
