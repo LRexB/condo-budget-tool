@@ -39,8 +39,18 @@ const UnitDisplay = ({
   // Keyboard navigation: Arrow keys for previous/next unit
   useEffect(() => {
     const handleKeyDown = (event) => {
+      // Get the currently focused element
+      const activeElement = document.activeElement;
+      
       // Only handle arrow keys if not typing in an input field
-      if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.tagName === 'SELECT') {
+      // Check both the event target and the currently focused element
+      if (
+        activeElement && 
+        (activeElement.tagName === 'INPUT' || 
+         activeElement.tagName === 'TEXTAREA' || 
+         activeElement.tagName === 'SELECT' ||
+         activeElement.isContentEditable)
+      ) {
         return;
       }
 
@@ -58,11 +68,11 @@ const UnitDisplay = ({
     };
 
     // Add event listener
-    window.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keydown', handleKeyDown);
 
     // Cleanup
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [currentIndex, totalUnits, onPrevUnit, onNextUnit]);
 
@@ -185,6 +195,20 @@ const UnitDisplay = ({
     if (!confirmed) return;
 
     try {
+      // First, save any pending changes to ensure the database is up to date
+      if (hasUnsavedChanges) {
+        if (onSaveUnitChanges) {
+          onSaveUnitChanges(currentIndex, repairItems);
+        }
+        if (onSaveToDatabase) {
+          await onSaveToDatabase();
+        }
+        setHasUnsavedChanges(false);
+        
+        // Wait a bit for the save to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
       const response = await axios.post('/api/copy-repair-item', {
         repairItemId: repairItem.id,
         repairType: repairItem.repair_type
