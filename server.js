@@ -919,42 +919,25 @@ app.post('/api/copy-repair-item', (req, res) => {
       return res.status(404).json({ error: 'Source repair item not found' });
     }
     
-    // Only copy non-empty values to avoid overwriting existing data
-    const updates = [];
-    const values = [];
+    // Copy ALL values from source item (including 0, empty strings, etc.)
+    // This is what "Copy to All" should do - make all items identical
+    const updates = [
+      'priority = ?',
+      'estimated_cost = ?',
+      'supplier = ?',
+      'required_completion_date = ?',
+      'actual_completion_status = ?',
+      'actual_completion_date = ?'
+    ];
     
-    if (sourceItem.priority && sourceItem.priority > 0) {
-      updates.push('priority = ?');
-      values.push(sourceItem.priority);
-    }
-    if (sourceItem.estimated_cost && sourceItem.estimated_cost > 0) {
-      updates.push('estimated_cost = ?');
-      values.push(sourceItem.estimated_cost);
-    }
-    if (sourceItem.supplier && sourceItem.supplier.trim() !== '') {
-      updates.push('supplier = ?');
-      values.push(sourceItem.supplier);
-    }
-    if (sourceItem.required_completion_date && sourceItem.required_completion_date.trim() !== '') {
-      updates.push('required_completion_date = ?');
-      values.push(sourceItem.required_completion_date);
-    }
-    if (sourceItem.actual_completion_status && sourceItem.actual_completion_status !== 'incomplete') {
-      updates.push('actual_completion_status = ?');
-      values.push(sourceItem.actual_completion_status);
-    }
-    if (sourceItem.actual_completion_date && sourceItem.actual_completion_date.trim() !== '') {
-      updates.push('actual_completion_date = ?');
-      values.push(sourceItem.actual_completion_date);
-    }
-    
-    if (updates.length === 0) {
-      return res.json({ 
-        success: true, 
-        message: 'No data to copy (all fields are empty)',
-        changes: 0
-      });
-    }
+    const values = [
+      sourceItem.priority || 0,
+      sourceItem.estimated_cost || 0,
+      sourceItem.supplier || '',
+      sourceItem.required_completion_date || '',
+      sourceItem.actual_completion_status || 'incomplete',
+      sourceItem.actual_completion_date || ''
+    ];
     
     values.push(repairType, repairItemId);
     
