@@ -44,6 +44,51 @@ function DatabaseScreen() {
     }).format(amount || 0);
   };
 
+  const exportRepairTypesToCSV = () => {
+    if (!databaseData || !databaseData.repairTypes || databaseData.repairTypes.length === 0) {
+      alert('No repair type data to export');
+      return;
+    }
+
+    // Create CSV header
+    const headers = ['Repair Type', 'Count', 'Total Cost', 'Average Cost', 'High Priority Count'];
+    
+    // Create CSV rows
+    const rows = databaseData.repairTypes.map(type => [
+      type.repair_type,
+      type.count,
+      type.total_cost,
+      type.average_cost.toFixed(2),
+      type.high_priority_count
+    ]);
+
+    // Combine header and rows
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => {
+        // Escape cells that contain commas or quotes
+        const cellStr = String(cell);
+        if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+          return `"${cellStr.replace(/"/g, '""')}"`;
+        }
+        return cellStr;
+      }).join(','))
+    ].join('\n');
+
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `repair_types_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
 
   if (loading) {
     return <div className="loading">Loading database data...</div>;
@@ -220,7 +265,16 @@ function DatabaseScreen() {
       {/* Repair Type Breakdown */}
       {databaseData.repairTypes && databaseData.repairTypes.length > 0 && (
         <div className="card">
-          <h2>Cost per Repair Type</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h2>Cost per Repair Type</h2>
+            <button 
+              className="btn" 
+              onClick={exportRepairTypesToCSV}
+              style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+            >
+              📥 Export to CSV
+            </button>
+          </div>
           <div className="table-container">
             <table className="table">
               <thead>
