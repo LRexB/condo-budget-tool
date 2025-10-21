@@ -680,7 +680,7 @@ app.get('/api/analysis/repair-types', (req, res) => {
   db.all(`
     SELECT 
       repair_type,
-      COUNT(*) as count,
+      SUM(CASE WHEN estimated_cost > 0 THEN 1 ELSE 0 END) as count,
       SUM(estimated_cost) as total_cost,
       AVG(estimated_cost) as average_cost,
       SUM(CASE WHEN priority >= 7 THEN 1 ELSE 0 END) as high_priority_count
@@ -912,15 +912,20 @@ app.post('/api/copy-repair-item', (req, res) => {
     WHERE id = ?
   `, [repairItemId], (err, sourceItem) => {
     if (err) {
+      console.error('Error fetching source repair item:', err);
       return res.status(500).json({ error: err.message });
     }
     
     if (!sourceItem) {
+      console.error(`Source repair item not found: ID ${repairItemId}`);
       return res.status(404).json({ error: 'Source repair item not found' });
     }
     
+    console.log('Source item data:', sourceItem);
+    
     // Copy ALL values from source item (including 0, empty strings, etc.)
     // This is what "Copy to All" should do - make all items identical
+    // Note: Use explicit checks to preserve 0 values (0 is valid for estimated_cost)
     const updates = [
       'priority = ?',
       'estimated_cost = ?',
@@ -931,14 +936,15 @@ app.post('/api/copy-repair-item', (req, res) => {
     ];
     
     const values = [
-      sourceItem.priority || 0,
-      sourceItem.estimated_cost || 0,
+      sourceItem.priority !== null && sourceItem.priority !== undefined ? sourceItem.priority : 0,
+      sourceItem.estimated_cost !== null && sourceItem.estimated_cost !== undefined ? sourceItem.estimated_cost : 0,
       sourceItem.supplier || '',
       sourceItem.required_completion_date || '',
       sourceItem.actual_completion_status || 'incomplete',
       sourceItem.actual_completion_date || ''
     ];
     
+    console.log('Values to copy:', values);
     values.push(repairType, repairItemId);
     
     // Update all repair items with the same repair type
