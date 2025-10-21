@@ -682,7 +682,11 @@ app.get('/api/analysis/repair-types', (req, res) => {
       repair_type,
       SUM(CASE WHEN estimated_cost > 0 THEN 1 ELSE 0 END) as count,
       SUM(estimated_cost) as total_cost,
-      AVG(estimated_cost) as average_cost,
+      CASE 
+        WHEN SUM(CASE WHEN estimated_cost > 0 THEN 1 ELSE 0 END) > 0 
+        THEN SUM(estimated_cost) * 1.0 / SUM(CASE WHEN estimated_cost > 0 THEN 1 ELSE 0 END)
+        ELSE 0 
+      END as average_cost,
       SUM(CASE WHEN priority >= 7 THEN 1 ELSE 0 END) as high_priority_count
     FROM repair_items 
     GROUP BY repair_type
